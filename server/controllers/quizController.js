@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { generateQuiz } = require('../services/geminiService');
 const { query } = require('../utils/dbHelper');
 
@@ -5,31 +7,53 @@ exports.createQuiz = async (req, res) => {
     // FIX: Get userId from the JWT token (set by authMiddleware)
     // Fallback to req.body.userId only if testing without auth
     const userId = req.user ? req.user.userId : req.body.userId;
-    const { textContent, title } = req.body;
+    
+    // We now expect 'filename' from the frontend instead of raw text
+    const { filename, title, difficulty = "BSc Undergraduate", numQuestions = 5 } = req.body;
 
-    if (!textContent || !userId) {
-        console.error("Missing Data - Text:", !!textContent, "UserID:", userId);
-        return res.status(400).json({ error: "Missing text content or user ID." });
+    if (!filename || !userId) {
+        console.error("Missing Data - Filename:", filename, "UserID:", userId);
+        return res.status(400).json({ error: "Missing filename or user ID." });
     }
 
     try {
         console.log(`Generating quiz for User ${userId}: ${title}`);
-        
-        // 1. Generate Questions via AI
-        const generatedQuestions = await generateQuiz(textContent, 5);
 
-        // 2. Insert Quiz Metadata
+        // 1. LOCATE THE FILE
+        const filePath = path.join(__dirname, '../uploads', filename);
+
+        if (!fs.existsSync(filePath)) {
+            console.error("File not found at:", filePath);
+            return res.status(404).json({ error: "PDF file not found on server." });
+        }
+
+        // 2. READ FILE AS BASE64 (Required for Gemini Vision)
+        const pdfBuffer = fs.readFileSync(filePath);
+        const base64Data = pdfBuffer.toString('base64');
+        
+        // 3. GENERATE QUESTIONS VIA AI (Sending Base64 instead of text)
+        // Note: generateQuiz now accepts (base64String, numQuestions, difficulty)
+        const generatedQuestions = await generateQuiz(base64Data, numQuestions, difficulty);
+
+        if (!generatedQuestions || generatedQuestions.length === 0) {
+            throw new Error("AI returned no questions.");
+        }
+
+        // 4. INSERT QUIZ METADATA
+        // We use the topic detected by the first question, or default to "General"
+        const detectedTopic = generatedQuestions[0].topic || "General";
+
         const quizResult = await query(
             `INSERT INTO quizzes (user_id, title, topic, difficulty) 
              VALUES ($1, $2, $3, $4) RETURNING quiz_id`,
-            [userId, title || "Untitled Quiz", generatedQuestions[0].topic, "BSc Undergraduate"]
+            [userId, title || "Untitled Quiz", detectedTopic, difficulty]
         );
 
-        // Handle ID retrieval
+        // Handle ID retrieval (Works for both Postgres and SQLite wrappers)
         let quizId = quizResult.length ? quizResult[0].quiz_id : quizResult.id;
         if (!quizId && this.lastID) quizId = this.lastID; 
 
-        // 3. Insert Questions
+        // 5. INSERT QUESTIONS
         for (const q of generatedQuestions) {
             await query(
                 `INSERT INTO questions (quiz_id, question_text, options, correct_answer, solution_explanation, metadata_tags)
@@ -57,7 +81,7 @@ exports.createQuiz = async (req, res) => {
     }
 };
 
-// ... keep exports.getQuiz as it was ...
+// ... existing getQuiz export remains unchanged ...
 exports.getQuiz = async (req, res) => {
     const { id } = req.params;
     try {

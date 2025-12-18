@@ -140,6 +140,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // --- DEBUG LOGS START ---
+    console.log("🖱️ Button Clicked!");
+    console.log("📝 Form Data:", formData);
+    // --- DEBUG LOGS END ---
+
     setLoading(true);
     setError('');
 
@@ -149,8 +155,12 @@ const Login = () => {
       : 'http://localhost:5000/api/auth/register';
 
     try {
+      console.log("🚀 Sending Request to:", endpoint); // Log the destination
+      
       const response = await axios.post(endpoint, formData);
       
+      console.log("✅ Response Received:", response.data); // Log the success
+
       // Success!
       const { token, user } = response.data;
       
@@ -162,6 +172,8 @@ const Login = () => {
       navigate('/dashboard');
 
     } catch (err) {
+      console.error("❌ Request Failed:", err); // Log the error object
+      
       // Handle Error
       const msg = err.response?.data?.error || 'Something went wrong. Please try again.';
       setError(msg);

@@ -1,7 +1,7 @@
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const pdf = require('pdf-parse'); // This will now work correctly
+const pdf = require('pdf-parse'); 
 
 // Configure Multer Storage
 const storage = multer.diskStorage({
@@ -29,7 +29,8 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ 
     storage: storage,
     fileFilter: fileFilter,
-    limits: { fileSize: 10 * 1024 * 1024 }
+    // FIX: Increased limit to 150MB
+    limits: { fileSize: 150 * 1024 * 1024 } 
 });
 
 const processPdf = async (req, res) => {
@@ -41,7 +42,7 @@ const processPdf = async (req, res) => {
         const filePath = req.file.path;
         const dataBuffer = fs.readFileSync(filePath);
 
-        // Standard usage of pdf-parse v1.1.1
+        // Standard usage of pdf-parse
         const data = await pdf(dataBuffer);
         
         res.status(200).json({
@@ -50,6 +51,7 @@ const processPdf = async (req, res) => {
             originalName: req.file.originalname,
             pageCount: data.numpages,
             textLength: data.text.length,
+            // Sending a snippet back to UI for confirmation
             preview: data.text.substring(0, 200) + '...' 
         });
 

@@ -5,7 +5,7 @@ import axios from 'axios';
 import { UploadCloud, Play, BarChart2, FileText, Clock, X, CheckCircle, Loader } from 'lucide-react';
 import Navbar from '../components/Navbar';
 
-// --- Styled Components (Existing + New Modal Styles) ---
+// --- Styled Components ---
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -102,7 +102,7 @@ const ActionCard = styled.div`
   p { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
 `;
 
-// --- New Upload Modal Styles ---
+// --- Modal Styles ---
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -167,7 +167,7 @@ const PrimaryButton = styled.button`
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null); // Reference to hidden input
+  const fileInputRef = useRef(null); 
 
   // State Management
   const [user, setUser] = useState({ username: 'Student' });
@@ -192,18 +192,16 @@ const Dashboard = () => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate type (Client side check)
     if (file.type !== 'application/pdf') {
       alert("Please upload a valid PDF file.");
       return;
     }
 
-    // Reset state & Start Upload
     setUploadState('uploading');
     setErrorMessage('');
     
     const formData = new FormData();
-    formData.append('pdf', file); // 'pdf' must match upload.single('pdf') in backend
+    formData.append('pdf', file);
 
     try {
       const token = localStorage.getItem('token');
@@ -211,11 +209,11 @@ const Dashboard = () => {
       const response = await axios.post('http://localhost:5000/api/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}` // Good practice for future protected routes
+          'Authorization': `Bearer ${token}`
         }
       });
 
-      // Success
+      // Success - Save the data so we have the filename!
       setUploadData(response.data);
       setUploadState('success');
 
@@ -229,15 +227,13 @@ const Dashboard = () => {
   const closeModal = () => {
     setUploadState('idle');
     setUploadData(null);
-    // Reset file input so user can select same file again if needed
     if(fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const startQuizGeneration = async () => {
     if (!uploadData) return;
 
-    setUploadState('uploading'); // Re-use loading state for generation
-    // Optional: Add a specific "generating" text state here if desired
+    setUploadState('uploading'); 
 
     try {
       const token = localStorage.getItem('token');
@@ -245,10 +241,16 @@ const Dashboard = () => {
       
       // Call the Quiz Generation Endpoint
       const response = await axios.post('http://localhost:5000/api/quiz/generate', {
-        userId: user.id || user.user_id, // Handle potential ID naming diffs
-        // In a real app, send the file ID. Here we use the preview text for the MVP demo.
-        textContent: uploadData.preview + " (Full text would go here in prod)", 
-        title: uploadData.originalName.replace('.pdf', '')
+        userId: user.id || user.user_id,
+        
+        // --- FIX IS HERE ---
+        // We now send the filename (which the server returned during upload)
+        filename: uploadData.filename, 
+        
+        // We removed textContent because we are using the file directly now
+        title: uploadData.originalName.replace('.pdf', ''),
+        difficulty: "BSc Undergraduate",
+        numQuestions: 5
       }, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -325,7 +327,7 @@ const Dashboard = () => {
               <>
                 <Loader size={48} className="animate-spin" color="#2563eb" style={{animation: 'spin 1s linear infinite'}} />
                 <h3>Processing Document...</h3>
-                <p>Analyzing PDF structure and extracting text.</p>
+                <p>Analyzing PDF structure and content.</p>
               </>
             )}
 
@@ -335,15 +337,9 @@ const Dashboard = () => {
                 <h3 style={{color: '#16a34a'}}>Analysis Complete!</h3>
                 <p>Successfully parsed <strong>{uploadData.originalName}</strong></p>
                 <p style={{fontSize: '0.9rem', color: '#666'}}>
-                  Found {uploadData.pageCount} pages ({uploadData.textLength} characters).
+                  Ready to generate questions based on this file.
                 </p>
                 
-                {/* Text Preview to prove it worked */}
-                <PreviewBox>
-                  <strong>Extracted Text Preview:</strong><br/>
-                  {uploadData.preview}
-                </PreviewBox>
-
                 <PrimaryButton onClick={startQuizGeneration}>
                   Generate Quiz <Play size={16} />
                 </PrimaryButton>
