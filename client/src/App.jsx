@@ -1,4 +1,6 @@
 import styled from "styled-components";
+import Hero from "./components/Hero";
+import Footer from "./components/Footer";
 
 
 const Container = styled.div`

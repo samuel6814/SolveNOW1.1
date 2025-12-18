@@ -5,6 +5,7 @@ import App from './App'
 import Dashboard from './pages/Dashboard' 
 import Login from './pages/Login' 
 import QuizInterface from './pages/QuizInterface' 
+import 'katex/dist/katex.min.css';
 
 
 createRoot(document.getElementById('root')).render(
